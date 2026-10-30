@@ -1,0 +1,93 @@
+<?php
+require_once 'config.php';
+require_once 'lang.php';
+
+if (!isset($_SESSION['user_id'])) {
+    header("Location: login.php");
+    exit;
+}
+
+$error = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Sanitasi input
+    $isbn         = htmlspecialchars(trim($_POST['isbn']));
+    $judul        = htmlspecialchars(trim($_POST['judul']));
+    $pengarang    = htmlspecialchars(trim($_POST['pengarang']));
+    $penerbit     = htmlspecialchars(trim($_POST['penerbit']));
+    $tahun_terbit = htmlspecialchars(trim($_POST['tahun_terbit']));
+
+    // Percabangan Validasi
+    if (empty($isbn) || empty($judul) || empty($pengarang) || empty($penerbit) || empty($tahun_terbit)) {
+        $error = $txt['err_empty'];
+    } elseif (!is_numeric($tahun_terbit)) {
+        $error = $txt['err_tahun'];
+    } else {
+        // Cek apakah ISBN sudah terdaftar di database
+        $check_stmt = mysqli_prepare($conn, "SELECT id FROM buku WHERE isbn = ?");
+        mysqli_stmt_bind_param($check_stmt, "s", $isbn);
+        mysqli_stmt_execute($check_stmt);
+        mysqli_stmt_store_result($check_stmt);
+
+        if (mysqli_stmt_num_rows($check_stmt) > 0) {
+            $error = "ISBN '$isbn' sudah digunakan oleh buku lain! Gunakan ISBN yang berbeda.";
+        } else {
+            // Jika ISBN belum ada, simpan data baru
+            $stmt = mysqli_prepare($conn, "INSERT INTO buku (isbn, judul, pengarang, penerbit, tahun_terbit) VALUES (?, ?, ?, ?, ?)");
+            mysqli_stmt_bind_param($stmt, "ssssi", $isbn, $judul, $pengarang, $penerbit, $tahun_terbit);
+            
+            if (mysqli_stmt_execute($stmt)) {
+                header("Location: index.php");
+                exit;
+            } else {
+                $error = "Error saat menyimpan data!";
+            }
+        }
+    }
+}
+?>
+<!DOCTYPE html>
+<html lang="<?= $lang_code ?>">
+<head>
+    <meta charset="UTF-8">
+    <title><?= $txt['add_new'] ?></title>
+    <link rel="stylesheet" href="style.css?v=4">
+</head>
+<body class="bg-dashboard">
+    <div class="card-center">
+        <h2><?= $txt['add_new'] ?></h2>
+        
+        <?php if ($error): ?>
+            <div class="alert"><?= $error ?></div>
+        <?php endif; ?>
+
+        <form action="" method="POST">
+            <div class="form-group">
+                <label><?= $txt['isbn'] ?></label>
+                <input type="text" name="isbn" value="<?= htmlspecialchars($_POST['isbn'] ?? '') ?>" required>
+            </div>
+            <div class="form-group">
+                <label><?= $txt['judul'] ?></label>
+                <input type="text" name="judul" value="<?= htmlspecialchars($_POST['judul'] ?? '') ?>" required>
+            </div>
+            <div class="form-group">
+                <label><?= $txt['pengarang'] ?></label>
+                <input type="text" name="pengarang" value="<?= htmlspecialchars($_POST['pengarang'] ?? '') ?>" required>
+            </div>
+            <div class="form-group">
+                <label><?= $txt['penerbit'] ?></label>
+                <input type="text" name="penerbit" value="<?= htmlspecialchars($_POST['penerbit'] ?? '') ?>" required>
+            </div>
+            <div class="form-group">
+                <label><?= $txt['tahun'] ?></label>
+                <input type="number" name="tahun_terbit" value="<?= htmlspecialchars($_POST['tahun_terbit'] ?? '') ?>" required>
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button type="submit" class="btn" style="flex: 1;"><?= $txt['save'] ?></button>
+                <a href="index.php" class="btn btn-delete" style="flex: 1; text-align: center; text-decoration: none; display: inline-block; line-height: 20px;"><?= $txt['back'] ?></a>
+            </div>
+        </form>
+    </div>
+</body>
+</html>
